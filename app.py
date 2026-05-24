@@ -7,11 +7,13 @@ import urllib.parse
 app = Flask(__name__)
 CORS(app)
 
+# Fallback resilient scraping index mirror
 GOGO_BASE = "https://gogoanime3.co"
 
 def get_headers():
     return {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
     }
 
 @app.route('/api/search', methods=['GET'])
@@ -69,14 +71,14 @@ def get_stream():
     alias = request.args.get('id', '').strip()
     episode = request.args.get('ep', '1').strip()
     
-    # Clean up names to get standard streaming IDs
-    clean_id = alias.replace("-sub", "").replace("-dub", "")
+    # Clean ID transformations to match pure global routing maps
+    clean_id = alias.replace("-sub", "").replace("-dub", "").lower()
     
-    # Use a premium direct-embed player index that explicitly allows third-party websites to play streams without loading blocks
-    direct_stream_url = f"https://vidsrc.me/embed/anime/{clean_id}/{episode}"
+    # Route via the updated API endpoint configuration which enforces safe sandboxed playbacks
+    stable_embed_url = f"https://vidsrc.pro/embed/anime/{clean_id}/{episode}/sub"
     
     return jsonify({
-        'stream_url': direct_stream_url,
+        'stream_url': stable_embed_url,
         'type': 'iframe'
     })
 
