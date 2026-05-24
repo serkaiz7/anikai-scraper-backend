@@ -7,14 +7,11 @@ import urllib.parse
 app = Flask(__name__)
 CORS(app)
 
-# Updated resilient mirror structure matching latest network routing clusters
 GOGO_BASE = "https://gogoanime3.co"
 
 def get_headers():
     return {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
     }
 
 @app.route('/api/search', methods=['GET'])
@@ -23,7 +20,6 @@ def search_anime():
     if not query:
         return jsonify([])
     
-    # URL escape queries safely
     encoded_query = urllib.parse.quote(query)
     search_url = f"{GOGO_BASE}/search.html?keyword={encoded_query}"
     
@@ -40,29 +36,17 @@ def search_anime():
                 a_tag = li.find('a')
                 
                 if name_p and img_tag and a_tag:
-                    title = name_p.text.strip()
-                    img = img_tag.get('src', '')
-                    alias = a_tag.get('href', '').replace('/category/', '')
-                    
                     results.append({
-                        'title': title,
-                        'image': img,
-                        'id': alias
+                        'title': name_p.text.strip(),
+                        'image': img_tag.get('src', ''),
+                        'id': a_tag.get('href', '').replace('/category/', '')
                     })
                     
         if not results:
-            # Smart auto-slug formatting to find exact titles if the search page times out
-            slug = query.lower().replace(' ', '-')
-            results.append({
-                'title': query.title(),
-                'image': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600',
-                'id': slug
-            })
-            
+            results.append({'title': query.title(), 'image': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600', 'id': query.lower().replace(' ', '-')})
         return jsonify(results)
     except Exception:
-        slug = query.lower().replace(' ', '-')
-        return jsonify([{'title': query.title(), 'image': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600', 'id': slug}])
+        return jsonify([{'title': query.title(), 'image': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600', 'id': query.lower().replace(' ', '-')}])
 
 @app.route('/api/anime/<alias>', methods=['GET'])
 def get_anime_details(alias):
@@ -70,56 +54,31 @@ def get_anime_details(alias):
     try:
         r = requests.get(url, headers=get_headers(), timeout=10)
         soup = BeautifulSoup(r.text, 'html.parser')
-        
         ep_page = soup.find('ul', id='episode_page')
         total_eps = 12
-        
         if ep_page and ep_page.find_all('li'):
-            last_li = ep_page.find_all('li')[-1]
-            a_tag = last_li.find('a')
+            a_tag = ep_page.find_all('li')[-1].find('a')
             if a_tag and a_tag.get('ep_end'):
                 total_eps = int(a_tag.get('ep_end'))
-                
-        return jsonify({
-            'title': alias.replace('-', ' ').title(),
-            'image': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600',
-            'total_episodes': total_eps
-        })
+        return jsonify({'title': alias.replace('-', ' ').title(), 'total_episodes': total_eps})
     except Exception:
-        return jsonify({'title': alias.replace('-', ' ').title(), 'image': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600', 'total_episodes': 24})
+        return jsonify({'title': alias.replace('-', ' ').title(), 'total_episodes': 24})
 
 @app.route('/api/stream', methods=['GET'])
 def get_stream():
     alias = request.args.get('id', '').strip()
     episode = request.args.get('ep', '1').strip()
     
-    # Clean up common variations in slugs
-    if alias.endswith('-sub') or alias.endswith('-dub'):
-        base_alias = alias
-    else:
-        base_alias = alias
-        
-    try:
-        # Build direct streaming search indexes using multi-provider player configurations
-        headers = get_headers()
-        
-        # Method A: Pull from the direct Gogoanime stream structure
-        gogo_url = f"{GOGO_BASE}/{base_alias}-episode-{episode}"
-        r = requests.get(gogo_url, headers=headers, timeout=10)
-        soup = BeautifulSoup(r.text, 'html.parser')
-        
-        iframe = soup.find('iframe')
-        if iframe and iframe.get('src'):
-            src = iframe.get('src')
-            stream_url = f"https:{src}" if src.startswith('//') else src
-            return jsonify({'stream_url': stream_url, 'type': 'iframe'})
-            
-    except Exception:
-        pass
-        
-    # Method B: Highly reliable universal embed player provider fallback 
-    backup_embed = f"https://vidsrc.cc/v2/embed/anime/{base_alias}/{episode}"
-    return jsonify({'stream_url': backup_embed, 'type': 'iframe'})
+    # Clean up names to get standard streaming IDs
+    clean_id = alias.replace("-sub", "").replace("-dub", "")
+    
+    # Use a premium direct-embed player index that explicitly allows third-party websites to play streams without loading blocks
+    direct_stream_url = f"https://vidsrc.me/embed/anime/{clean_id}/{episode}"
+    
+    return jsonify({
+        'stream_url': direct_stream_url,
+        'type': 'iframe'
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
