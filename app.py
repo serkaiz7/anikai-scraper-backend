@@ -7,12 +7,12 @@ import urllib.parse
 app = Flask(__name__)
 CORS(app)
 
+# Active Gogoanime source cluster mirror
 GOGO_BASE = "https://gogoanime3.co"
 
 def get_headers():
     return {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
     }
 
 @app.route('/api/search', methods=['GET'])
@@ -70,15 +70,15 @@ def get_stream():
     alias = request.args.get('id', '').strip()
     episode = request.args.get('ep', '1').strip()
     
-    # Standardize slugs to match database indexes across video proxies
+    # Clean ID formatting matching universal database tracks
     clean_id = alias.replace("-sub", "").replace("-dub", "").lower()
     
-    # Utilizing an open cross-origin streaming gateway optimized for modern browser sandboxes
-    direct_player_url = f"https://vidsrc.vip/embed/anime/{clean_id}/{episode}/sub"
+    # Route via an unblocked API node cluster 
+    unblocked_player = f"https://vidsrc.cc/v2/embed/anime/{clean_id}/{episode}"
     
     return jsonify({
-        'stream_url': direct_player_url,
-        'type': 'iframe'
+        'stream_url': unblocked_player,
+        'type': 'direct'
     })
 
 if __name__ == '__main__':
