@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 CORS(app)
 
-# Updated resilient domain mirrors matching modern anipy-cli target routes
+# Active Gogoanime source cluster mirror
 GOGO_BASE = "https://anitaku.bz" 
 
 @app.route('/api/search', methods=['GET'])
@@ -15,7 +15,6 @@ def search_anime():
     if not query:
         return jsonify([])
     
-    # Format queries seamlessly to match indexing
     formatted_query = query.replace(' ', '-')
     search_url = f"{GOGO_BASE}/search.html?keyword={query}"
     
@@ -27,7 +26,6 @@ def search_anime():
         soup = BeautifulSoup(r.text, 'html.parser')
         results = []
         
-        # Highly accurate extraction targets matching modern structural classes
         items_container = soup.find('ul', class_='items')
         if items_container:
             for li in items_container.find_all('li'):
@@ -46,19 +44,18 @@ def search_anime():
                         'id': alias
                     })
         
-        # Safety Fallback: If scraping returns nothing, dynamically generate a live playable card
+        # Self-healing fallback option
         if not results:
             results.append({
-                'title': f"{query.title()} (Direct Stream Source)",
+                'title': f"{query.title()} (Backup Link)",
                 'image': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600',
                 'id': formatted_query.lower()
             })
             
         return jsonify(results)
-    except Exception as e:
-        # Dynamic self-healing route so your site never blanks out
+    except Exception:
         return jsonify([{
-            'title': f"{query.title()} (Stream Mirror)",
+            'title': f"{query.title()} (Backup Link)",
             'image': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600',
             'id': formatted_query.lower()
         }])
@@ -71,9 +68,8 @@ def get_anime_details(alias):
         r = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(r.text, 'html.parser')
         
-        # Locate exact target pagination indicators
         ep_page = soup.find('ul', id='episode_page')
-        total_eps = 12 # Default safe stream count fallback
+        total_eps = 12
         
         if ep_page and ep_page.find_all('li'):
             last_li = ep_page.find_all('li')[-1]
@@ -87,7 +83,6 @@ def get_anime_details(alias):
             'total_episodes': total_eps
         })
     except Exception:
-        # Automatic recovery logic for seamless streaming fallback
         return jsonify({
             'title': alias.replace('-', ' ').title(),
             'image': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600',
@@ -99,9 +94,28 @@ def get_stream():
     alias = request.args.get('id')
     episode = request.args.get('ep')
     
-    # Universal embedding link resolution template
-    stream_url = f"https://anira.to/embed/{alias}-episode-{episode}"
-    return jsonify({'stream_url': stream_url, 'type': 'iframe'})
+    # 1. First, build the native Gogoanime episode page path
+    gogo_ep_page = f"{GOGO_BASE}/{alias}-episode-{episode}"
+    
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        r = requests.get(gogo_ep_page, headers=headers, timeout=10)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        
+        # 2. Extract the direct streaming player iframe link inside the webpage structure
+        # (This avoids dead intermediate domains completely)
+        iframe_tag = soup.find('iframe')
+        if iframe_tag and iframe_tag.get('src'):
+            raw_src = iframe_tag.get('src')
+            final_embed_url = f"https:{raw_src}" if raw_src.startswith('//') else raw_src
+            return jsonify({'stream_url': final_embed_url, 'type': 'iframe'})
+            
+    except Exception as e:
+        print(f"Primary fetch failed: {e}")
+        
+    # 3. Ultimate resilient backup fallback if scraping fails entirely
+    universal_fallback = f"https://vidsrc.to/embed/anime/{alias}/{episode}"
+    return jsonify({'stream_url': universal_fallback, 'type': 'iframe'})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
